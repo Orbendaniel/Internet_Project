@@ -6,7 +6,7 @@ HOST = '127.0.0.1'  # Standard loopback IP address (localhost)
 PORT = 5000  # Port to listen on (non-privileged ports are > 1023)
 FORMAT = 'utf-8'  # Define the encoding format of messages from client-server
 ADDR = (HOST, PORT)  # Creating a tuple of IP+PORT
-
+x=1
 def start_server():
     # Step 1: Bind and start listening
     server_socket.bind(ADDR)
@@ -30,7 +30,6 @@ def start_server():
         thread = threading.Thread(target=handle_client, args=(connection, address))
         thread.start()
 
-      
 def handle_client(conn, addr):
     print(f"[HANDLING CLIENT] {addr}")
     connected = True
@@ -39,7 +38,7 @@ def handle_client(conn, addr):
         while connected:
             # Step 1: Receive a move from the client
             msg = conn.recv(1024).decode(FORMAT)
-            
+
             if not msg:
                 print(f"[DISCONNECT] Empty message received. Closing connection to {addr}")
                 break
