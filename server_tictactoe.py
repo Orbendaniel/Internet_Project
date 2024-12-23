@@ -6,7 +6,8 @@ HOST = '127.0.0.1'  # Standard loopback IP address (localhost)
 PORT = 5000  # Port to listen on (non-privileged ports are > 1023)
 FORMAT = 'utf-8'  # Define the encoding format of messages from client-server
 ADDR = (HOST, PORT)  # Creating a tuple of IP+PORT
-x=1
+x=1 
+x2=2
 def start_server():
     # Step 1: Bind and start listening
     server_socket.bind(ADDR)
