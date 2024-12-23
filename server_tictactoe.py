@@ -8,6 +8,7 @@ FORMAT = 'utf-8'  # Define the encoding format of messages from client-server
 ADDR = (HOST, PORT)  # Creating a tuple of IP+PORT
 x=1 
 x2=2
+x3=3
 def start_server():
     # Step 1: Bind and start listening
     server_socket.bind(ADDR)
