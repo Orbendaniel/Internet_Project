@@ -28,8 +28,8 @@ def start_client():
     except ConnectionResetError:
         print("[ERROR] Server disconnected unexpectedly.")
     finally:
-        client.close()
-        
+        client.close()         
+
 
 if __name__ == "__main__":
     start_client()
