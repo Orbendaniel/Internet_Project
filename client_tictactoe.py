@@ -2,7 +2,7 @@ import socket
 HOST = '127.0.0.1'  # Replace with the server's IP if needed
 PORT = 5000         # Replace with the server's port if needed
 FORMAT = 'utf-8'
-
+#CAN YOU SEE THIS 
 def connect_to_server(host, port):
         # Step 1: Create a socket
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
