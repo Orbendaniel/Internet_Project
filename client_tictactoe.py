@@ -35,7 +35,7 @@ def connect_to_server(host, port):
 
             # Step 4: Handle 'start' command
             if message.lower() == 'start':
-                print("[GAME START]")
+                print("[GAME START]- Client request ")
                 play_game(client_socket)  # Enter the game loop
                 print("[GAME ENDED] You can continue communicating or quit.")
 
@@ -92,27 +92,25 @@ def play_game(client_socket):
             status = game_data["status"]
             winner = game_data.get("winner")
             next_turn = game_data["next_turn"]
-
             # Step 3: Display the updated game board
             display_board(game_state)
-
             # Step 4: Check game status
-            if status == "win":
-                print(f"[GAME OVER] {winner} wins!")
-                break
-            elif status == "draw":
-                print("[GAME OVER] It's a draw!")
-                break
+            # if status == "win":
+            #     print(f"[GAME OVER] {winner} wins!")
+            #     break
+            # elif status == "draw":
+            #     print("[GAME OVER] It's a draw!")
+            #     break
 
-            # Step 5: Handle the player's turn
-            if next_turn == "X":  # Adjust this logic to match the client's player marker
-                move = input("Enter your move (row, column or 'end' to stop the game: ")
-                if move.lower() == "end":
-                    print("[GAME END] Exiting the game loop...")
-                    break
-                send_move(client_socket, move)
-            else:
-                print("[WAIT] Waiting for the opponent's move...")
+        #     # Step 5: Handle the player's turn
+        #     if next_turn == "X":  # Adjust this logic to match the client's player marker
+        #         move = input("Enter your move (row, column or 'end' to stop the game: ")
+        #         if move.lower() == "end":
+        #             print("[GAME END] Exiting the game loop...")
+        #             break
+        #         send_move(client_socket, move)
+        #     else:
+        #         print("[WAIT] Waiting for the opponent's move...")
 
         except Exception as e:
             print(f"[ERROR] Failed to process game state: {e}")
@@ -120,17 +118,15 @@ def play_game(client_socket):
 
 def display_board(game_state):
     """
-    Displays the current game board in a text-based format.
+    Dynamically displays the game board using only vertical dividers.
 
     Args:
         game_state (list of list): A matrix representing the Tic-Tac-Toe board.
     """
     print("\nCurrent Board:")
     for row in game_state:
-        print(" | ".join(cell if cell else " " for cell in row))
-        print("-" * (len(row) * 2 - 1))  # Adjust separator length dynamically
+        # Join the cell values with vertical dividers, replacing empty cells with spaces
+        print("| " + " | ".join(cell if cell else " " for cell in row) + " |")
 
-
-# Direct execution block
 if __name__ == "__main__":
     connect_to_server(HOST, PORT)

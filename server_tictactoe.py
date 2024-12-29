@@ -13,7 +13,7 @@ def start_server():
     print(f"[LISTENING] Server is listening on {HOST}:{PORT}")
     server_socket.listen()
     
-    active_connections = 0  # Counter for active clients/games
+    active_connections = 0  # Counter for active connections
     clients = []  # List to store connected clients
     
     # Step 2: Accept clients dynamically
@@ -27,10 +27,10 @@ def start_server():
         print(f"[ACTIVE CONNECTIONS] {active_connections}")
         
         # Step 3: Handle client in a new thread
-        thread = threading.Thread(target=handle_client, args=(connection, address,active_connections))
+        thread = threading.Thread(target=handle_client, args=(connection, address,active_connections,clients))
         thread.start()
 
-def handle_client(connection, addr, active_connections):
+def handle_client(connection, addr, active_connections,clients):
     print(f"[HANDLING CLIENT] {addr}")
     connected = True
     game_state = None  # Initialize game_state as None until 'start' is received
@@ -55,24 +55,13 @@ def handle_client(connection, addr, active_connections):
 
             if msg.lower() == 'start':
                 print(f"[START] Client {addr} is starting the game...")
-                
-                if active_connections > 2:
-                    # Initialize the game state dynamically based on active connections
-                    board_size = (active_connections + 1) ** 2
-                    game_state = [["" for _ in range(board_size)] for _ in range(board_size)]
-                    print(f"[GAME STATE INITIALIZED] Board size: {board_size}x{board_size}")
-                    print("im here")
+                board_size = 3 if active_connections <= 2 else (active_connections + 1) ** 2
+                game_state = [["" for _ in range(board_size)] for _ in range(board_size)]
+                print(f"[GAME STATE INITIALIZED] Board size: {board_size}x{board_size}")
 
-                if active_connections <=2:
-                    # Initialize the game state to the default 3x3  
-                    board_size = 3
-                    game_state = [["" for _ in range(board_size)] for _ in range(board_size)]
-                    print(f"[GAME STATE INITIALIZED] Board size: {board_size}x{board_size}")
-                    print("im default")
-
-             
                 # Acknowledge the start to the client
                 connection.send(f"Game started with a {board_size}x{board_size} board.".encode(FORMAT))
+                broadcast_update(clients, game_state, next_turn=None, status="ongoing", winner=None)
                 continue  # Continue to the next iteration to wait for moves
             
             # Process moves only if the game has started
@@ -102,9 +91,10 @@ def broadcast_update(clients, game_state, next_turn, status, winner=None):
         status (str): The current status of the game ("ongoing", "win", "draw").
         winner (str or None): The winning player, if any.
     """
+    formatted_board = [[" " if cell == "" else cell for cell in row] for row in game_state]
     # Prepare the game data dictionary
     game_data = {
-        "board": game_state,
+        "board": formatted_board,
         "next_turn": next_turn,
         "status": status,
         "winner": winner,
@@ -112,6 +102,8 @@ def broadcast_update(clients, game_state, next_turn, status, winner=None):
 
     # Convert the game data to a string for transmission
     update_message = str(game_data)
+    print(f"[DEBUG] Sending game data: {update_message}")  # Debugging
+
 
     # Send the game data to all connected clients
     for client in clients:
@@ -134,22 +126,22 @@ def update_game_data(game_state, move, current_player, players):
     Returns:
         dict: Updated game data including the board, next turn, status, and winner.
     """
-    row, col = move
-    game_state[row][col] = current_player  # Update the board with the current player's marker
+    #row, col = move
+    #game_state[row][col] = current_player  # Update the board with the current player's marker
 
     # Check the game status
     #status, winner = check_winner(game_state, players)
 
     # Determine the next turn
-    next_turn_index = (players.index(current_player) + 1) % len(players)
-    next_turn = players[next_turn_index]
+    #next_turn_index = (players.index(current_player) + 1) % len(players)
+    #next_turn = players[next_turn_index]
 
     # Prepare the game data
     game_data = {
         "board": game_state,
-        "next_turn": next_turn,
-        #"status": status,
-        #"winner": winner,
+        #"next_turn": next_turn, 
+        #"status": status, 
+        #"winner": winner,  
     }
 
     return game_data
