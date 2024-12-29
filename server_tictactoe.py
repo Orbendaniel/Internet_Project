@@ -61,12 +61,15 @@ def handle_client(connection, addr, active_connections):
                     board_size = (active_connections + 1) ** 2
                     game_state = [["" for _ in range(board_size)] for _ in range(board_size)]
                     print(f"[GAME STATE INITIALIZED] Board size: {board_size}x{board_size}")
+                    print("im here")
 
-                else:
-                    # Initialize the game state dynamically based on active connections
+                if active_connections <=2:
+                    # Initialize the game state to the default 3x3  
                     board_size = 3
                     game_state = [["" for _ in range(board_size)] for _ in range(board_size)]
                     print(f"[GAME STATE INITIALIZED] Board size: {board_size}x{board_size}")
+                    print("im default")
+
              
                 # Acknowledge the start to the client
                 connection.send(f"Game started with a {board_size}x{board_size} board.".encode(FORMAT))
@@ -135,7 +138,7 @@ def update_game_data(game_state, move, current_player, players):
     game_state[row][col] = current_player  # Update the board with the current player's marker
 
     # Check the game status
-    status, winner = check_winner(game_state, players)
+    #status, winner = check_winner(game_state, players)
 
     # Determine the next turn
     next_turn_index = (players.index(current_player) + 1) % len(players)
@@ -145,8 +148,8 @@ def update_game_data(game_state, move, current_player, players):
     game_data = {
         "board": game_state,
         "next_turn": next_turn,
-        "status": status,
-        "winner": winner,
+        #"status": status,
+        #"winner": winner,
     }
 
     return game_data

@@ -36,7 +36,6 @@ def connect_to_server(host, port):
             # Step 4: Handle 'start' command
             if message.lower() == 'start':
                 print("[GAME START]")
-                initialize_board(client_socket)  # Initialize and send the board
                 play_game(client_socket)  # Enter the game loop
                 print("[GAME ENDED] You can continue communicating or quit.")
 
@@ -118,27 +117,6 @@ def play_game(client_socket):
         except Exception as e:
             print(f"[ERROR] Failed to process game state: {e}")
             break
-
-
-def initialize_board(client_socket):
-    """
-    Initializes a default 3x3 board and sends it to the server.
-
-    Args:
-        client_socket (socket): The client socket to communicate with the server.
-    """
-    # Initialize a 3x3 board
-    board = [["" for _ in range(3)] for _ in range(3)]
-    print("[INFO] Initialized a 3x3 board.")
-
-    # Send the board to the server
-    try:
-        board_message = {"board": board}
-        client_socket.send(str(board_message).encode(FORMAT))
-        print("[SENT] Initial board sent to the server.")
-    except Exception as e:
-        print(f"[ERROR] Failed to send the initial board: {e}")
-
 
 def display_board(game_state):
     """
