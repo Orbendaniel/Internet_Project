@@ -63,7 +63,7 @@ def receive_game_update(client_socket):
     Receives updates from the server.
     """
     try:
-        update = client_socket.recv(1024).decode(FORMAT)
+        update = client_socket.recv(8192).decode(FORMAT) #was increased from 1024
         if not update:
             print("[ERROR] Lost connection to the server.")
             return None
