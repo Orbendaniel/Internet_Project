@@ -2,7 +2,7 @@ import socket
 
 HOST = '127.0.0.1'  # Replace with the server's IP if needed
 PORT = 5000  # Replace with the server's port if needed
-
+FORMAT = 'utf-8'
 
 def connect_to_server(host, port):
     """
@@ -22,7 +22,7 @@ def connect_to_server(host, port):
             # Step 1: Take input from the user
             message = input(
                 "write 'start' to begin the game, 'quit' to disconnect, or any other message to communicate:\n")
-            client_socket.send(message.encode('utf-8'))
+            client_socket.send(message.encode(FORMAT))
 
             # Step 2: Handle 'quit' command
             if message.lower() == 'quit':
@@ -30,16 +30,15 @@ def connect_to_server(host, port):
                 break
 
             # Step 3: Receive server response
-            response = client_socket.recv(1024).decode('utf-8')
+            response = client_socket.recv(1024).decode(FORMAT)
             print(f"[SERVER RESPONSE] {response}")
 
             # Step 4: Handle 'start' command
             if message.lower() == 'start':
-                print("[GAME START] Starting the game...")
-                # game_running = True
+                print("[GAME START]")
+                initialize_board(client_socket)  # Initialize and send the board
                 play_game(client_socket)  # Enter the game loop
-                # game_running = False   Exit the game loop
-                print("[GAME END] You can continue communicating or quit.")
+                print("[GAME ENDED] You can continue communicating or quit.")
 
     except ConnectionResetError:
         print("[ERROR] Server disconnected unexpectedly.")
@@ -52,7 +51,7 @@ def send_move(client_socket, move):
     Sends the player's move to the server.
     """
     try:
-        client_socket.send(move.encode('utf-8'))
+        client_socket.send(move.encode(FORMAT))
         print(f"[SENT] Move sent to server: {move}")
     except BrokenPipeError:
         print("[ERROR] Unable to send move. Connection to the server is broken.")
@@ -65,7 +64,7 @@ def receive_game_update(client_socket):
     Receives updates from the server.
     """
     try:
-        update = client_socket.recv(1024).decode('utf-8')
+        update = client_socket.recv(1024).decode(FORMAT)
         if not update:
             print("[ERROR] Lost connection to the server.")
             return None
@@ -121,18 +120,37 @@ def play_game(client_socket):
             break
 
 
+def initialize_board(client_socket):
+    """
+    Initializes a default 3x3 board and sends it to the server.
+
+    Args:
+        client_socket (socket): The client socket to communicate with the server.
+    """
+    # Initialize a 3x3 board
+    board = [["" for _ in range(3)] for _ in range(3)]
+    print("[INFO] Initialized a 3x3 board.")
+
+    # Send the board to the server
+    try:
+        board_message = {"board": board}
+        client_socket.send(str(board_message).encode(FORMAT))
+        print("[SENT] Initial board sent to the server.")
+    except Exception as e:
+        print(f"[ERROR] Failed to send the initial board: {e}")
+
+
 def display_board(game_state):
     """
     Displays the current game board in a text-based format.
 
     Args:
-        game_state (list of list): A 3x3 matrix representing the Tic-Tac-Toe board.
-                                   Each cell can contain 'X', 'O', or '' (empty string).
+        game_state (list of list): A matrix representing the Tic-Tac-Toe board.
     """
     print("\nCurrent Board:")
     for row in game_state:
         print(" | ".join(cell if cell else " " for cell in row))
-        print("-" * 9)
+        print("-" * (len(row) * 2 - 1))  # Adjust separator length dynamically
 
 
 # Direct execution block
