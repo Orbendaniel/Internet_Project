@@ -46,8 +46,7 @@ def connect_to_server(host, port):
 
         while True:
             # Step 1: Take input from the user
-            message = input(
-                "write 'start' to begin the game, 'quit' to disconnect, or any other message to communicate:\n")
+            message = input("write 'start' to begin the game, 'quit' to disconnect, or any other message to communicate:\n")
             client_socket.send(message.encode(FORMAT))
 
             # Step 2: Handle 'quit' command
@@ -55,9 +54,9 @@ def connect_to_server(host, port):
                 print("[DISCONNECT] Closing connection.")
                 break
 
-            # Step 3: Receive server response
-            response = client_socket.recv(1024).decode(FORMAT)
-            print(f"[SERVER RESPONSE] {response}")
+            # # Step 3: Receive server response
+            # response = client_socket.recv(1024).decode(FORMAT)
+            # print(f"[SERVER RESPONSE] {response}")
             
     except ConnectionResetError:
         print("[ERROR] Server disconnected unexpectedly.")

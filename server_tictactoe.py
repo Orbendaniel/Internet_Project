@@ -53,9 +53,12 @@ def handle_client(connection, addr, active_connections,clients):
                 active_connections -=1
                 break
 
+
             if msg.lower() == 'start':
                 print(f"[START] Client {addr} is starting the game...")
-                board_size = 3 if active_connections <= 2 else (active_connections + 1) ** 2
+
+                num_players = len(clients)  # Use the length of the clients list
+                board_size = 3 if num_players <= 2 else (num_players + 1) ** 2
                 game_state = [["" for _ in range(board_size)] for _ in range(board_size)]
                 # Send "game started" notification to all clients
                 for client in clients:
@@ -64,16 +67,21 @@ def handle_client(connection, addr, active_connections,clients):
                         print(f"[BROADCAST] Sent 'game started' message to client: {client}")
                     except Exception as e:
                         print(f"[ERROR] Failed to send 'game started' message to client: {e}")
-            broadcast_update(clients, game_state, next_turn=None, status="ongoing", winner=None)
-            continue  # Continue to the next iteration to wait for moves
-            
-            # Process moves only if the game has started
-            if game_state:
-                # Here we can add logic to process moves (e.g., update the game state)
-                response = f"Server received your move: {msg}"  # Placeholder response
-                connection.send(response.encode(FORMAT))
-            else:
-                connection.send("Game has not started yet. Send 'start' to begin.".encode(FORMAT))
+                broadcast_update(clients, game_state, next_turn=None, status="ongoing", winner=None)
+                continue  # Continue to the next iteration to wait for moves
+
+        # Handle other messages (e.g., chat messages)
+        print(f"[CHAT] {addr} says: {msg}")
+        connection.send(f"[SERVER RESPONSE] Message received: {msg}".encode(FORMAT))
+
+
+            # # Process moves only if the game has started
+            # if game_state:
+            #     # Here we can add logic to process moves (e.g., update the game state)
+            #     response = f"Server received your move: {msg}"  # Placeholder response
+            #     connection.send(response.encode(FORMAT))
+            # else:
+            #     connection.send("Game has not started yet. Send 'start' to begin.".encode(FORMAT))
         
     except ConnectionResetError:
         print(f"[ERROR] Connection with {addr} reset unexpectedly.")
