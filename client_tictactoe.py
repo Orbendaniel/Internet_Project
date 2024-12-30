@@ -3,7 +3,7 @@ import threading
 HOST = '127.0.0.1'  # Replace with the server's IP if needed
 PORT = 5000  # Replace with the server's port if needed
 FORMAT = 'utf-8'
-#hello 
+
 def listen_to_server(client_socket):
     """
     Continuously listens for messages from the server.
