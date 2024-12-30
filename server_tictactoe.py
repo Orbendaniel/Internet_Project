@@ -57,12 +57,15 @@ def handle_client(connection, addr, active_connections,clients):
                 print(f"[START] Client {addr} is starting the game...")
                 board_size = 3 if active_connections <= 2 else (active_connections + 1) ** 2
                 game_state = [["" for _ in range(board_size)] for _ in range(board_size)]
-                print(f"[GAME STATE INITIALIZED] Board size: {board_size}x{board_size}")
-
-                # Acknowledge the start to the client
-                connection.send(f"Game started with a {board_size}x{board_size} board.".encode(FORMAT))
-                broadcast_update(clients, game_state, next_turn=None, status="ongoing", winner=None)
-                continue  # Continue to the next iteration to wait for moves
+                # Send "game started" notification to all clients
+                for client in clients:
+                    try:
+                        client.send("game started".encode(FORMAT))
+                        print(f"[BROADCAST] Sent 'game started' message to client: {client}")
+                    except Exception as e:
+                        print(f"[ERROR] Failed to send 'game started' message to client: {e}")
+            broadcast_update(clients, game_state, next_turn=None, status="ongoing", winner=None)
+            continue  # Continue to the next iteration to wait for moves
             
             # Process moves only if the game has started
             if game_state:

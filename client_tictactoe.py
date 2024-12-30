@@ -1,5 +1,5 @@
 import socket
-
+import threading
 HOST = '127.0.0.1'  # Replace with the server's IP if needed
 PORT = 5000  # Replace with the server's port if needed
 FORMAT = 'utf-8'
@@ -14,6 +14,11 @@ def connect_to_server(host, port):
     # Step 2: Connect to the server
     client_socket.connect((host, port))
     print(f"[CONNECTED] Successfully connected to {host}:{port}")
+
+    # Start the listener thread
+    listener_thread = threading.Thread(target=listen_to_server, args=(client_socket,))
+    listener_thread.daemon = True  # Ensure the thread exits when the main program exits
+    listener_thread.start()
 
     try:
         # game_running = False   Flag to indicate if the game is active
@@ -32,8 +37,14 @@ def connect_to_server(host, port):
             # Step 3: Receive server response
             response = client_socket.recv(1024).decode(FORMAT)
             print(f"[SERVER RESPONSE] {response}")
+            
+            # Step 4: Detect 'game started' broadcast from the server
+            if "game started" in response.lower():
+                print("[INFO] Game has started! Entering game loop...")
+                play_game(client_socket)  # Automatically enter the game loop
+                print("[GAME ENDED] Returning to communication loop.")
 
-            # Step 4: Handle 'start' command
+            # Step 5: Handle 'start' command
             if message.lower() == 'start':
                 print("[GAME START]- Client request ")
                 play_game(client_socket)  # Enter the game loop
@@ -44,6 +55,26 @@ def connect_to_server(host, port):
     finally:
         client_socket.close()
 
+def listen_to_server(client_socket):
+    """
+    Continuously listens for messages from the server.
+    """
+    while True:
+        try:
+            response = receive_game_update(client_socket)
+            if not response:
+                print("[ERROR] Lost connection to the server.")
+                break
+
+            # Check for "game started" message
+            if "game started" in response.lower():
+                print("[INFO] Game has started! Entering game loop...")
+                play_game(client_socket)  # Automatically enter the game loop
+                print("[GAME ENDED] Returning to communication loop.")
+
+        except Exception as e:
+            print(f"[ERROR] An error occurred while listening to the server: {e}")
+            break
 
 def send_move(client_socket, move):
     """
