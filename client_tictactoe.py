@@ -36,18 +36,21 @@ def connect_to_server(host, port):
     client_socket.connect((host, port))
     print(f"[CONNECTED] Successfully connected to {host}:{port}")
     
-    # # Step 3: Receive the assigned marker from the server
-    # player_marker = client_socket.recv(1024).decode(FORMAT)
-    # print(f"[INFO] You are assigned the marker: {player_marker}")
+    # Step 3: Receive the assigned marker from the server
+    try:
+        player_marker = client_socket.recv(1024).decode(FORMAT)
+        print(f"[INFO] You are assigned the marker: {player_marker}")
+    except Exception as e:
+        print(f"[ERROR] Failed to receive marker: {e}")
+        client_socket.close()
+        return
 
-    # Start the listener thread
+    # Step 4: Start the listener thread
     listener_thread = threading.Thread(target=listen_to_server, args=(client_socket ,player_marker))
     listener_thread.daemon = True  # Ensure the thread exits when the main program exits
     listener_thread.start()
 
     try:
-        # game_running = False   Flag to indicate if the game is active
-
         while True:
             # Step 1: Take input from the user
             message = input("write 'start' to begin the game, 'quit' to disconnect, or any other message to communicate:\n")
@@ -57,8 +60,6 @@ def connect_to_server(host, port):
             if message.lower() == 'quit':
                 print("[DISCONNECT] Closing connection.")
                 break
-
-
     except ConnectionResetError:
         print("[ERROR] Server disconnected unexpectedly.")
     finally:
