@@ -4,7 +4,7 @@ HOST = '127.0.0.1'  # Replace with the server's IP if needed
 PORT = 5000  # Replace with the server's port if needed
 FORMAT = 'utf-8'
 
-def listen_to_server(client_socket):
+def listen_to_server(client_socket, player_marker):
     """
     Continuously listens for messages from the server.
     """
@@ -18,7 +18,7 @@ def listen_to_server(client_socket):
             # Check for "game started" message
             if "game started" in response.lower():
                 print("[INFO] Game has started! Entering game loop...")
-                play_game(client_socket)  # Automatically enter the game loop
+                play_game(client_socket,player_marker)  # Automatically enter the game loop
                 print("[GAME ENDED] Returning to communication loop.")
 
         except Exception as e:
@@ -35,9 +35,13 @@ def connect_to_server(host, port):
     # Step 2: Connect to the server
     client_socket.connect((host, port))
     print(f"[CONNECTED] Successfully connected to {host}:{port}")
+    
+    # # Step 3: Receive the assigned marker from the server
+    # player_marker = client_socket.recv(1024).decode(FORMAT)
+    # print(f"[INFO] You are assigned the marker: {player_marker}")
 
     # Start the listener thread
-    listener_thread = threading.Thread(target=listen_to_server, args=(client_socket,))
+    listener_thread = threading.Thread(target=listen_to_server, args=(client_socket ,player_marker))
     listener_thread.daemon = True  # Ensure the thread exits when the main program exits
     listener_thread.start()
 
@@ -54,10 +58,7 @@ def connect_to_server(host, port):
                 print("[DISCONNECT] Closing connection.")
                 break
 
-            # # Step 3: Receive server response
-            # response = client_socket.recv(1024).decode(FORMAT)
-            # print(f"[SERVER RESPONSE] {response}")
-            
+
     except ConnectionResetError:
         print("[ERROR] Server disconnected unexpectedly.")
     finally:
@@ -93,7 +94,7 @@ def receive_game_update(client_socket):
         return None
 
 
-def play_game(client_socket):
+def play_game(client_socket,player_marker):
     """
     Handles the main game loop when the game is active.
     """
@@ -109,7 +110,7 @@ def play_game(client_socket):
         try:
             game_data = eval(update)  # Convert the response string to a Python dictionary
             game_state = game_data["board"]
-            status = game_data["status"]#
+            status = game_data["status"]
             winner = game_data.get("winner")
             next_turn = game_data["next_turn"]
 
@@ -124,15 +125,15 @@ def play_game(client_socket):
             #     print("[GAME OVER] It's a draw!")
             #     break
 
-        #     # Step 5: Handle the player's turn
-        #     if next_turn == "X":  # Adjust this logic to match the client's player marker
-        #         move = input("Enter your move (row, column or 'end' to stop the game: ")
-        #         if move.lower() == "end":
-        #             print("[GAME END] Exiting the game loop...")
-        #             break
-        #         send_move(client_socket, move)
-        #     else:
-        #         print("[WAIT] Waiting for the opponent's move...")
+            # Step 5: Handle the player's turn
+            if next_turn == player_marker:  
+                move = input("Enter your move (row, column or 'end' to stop the game: ")
+                if move.lower() == "end":
+                    print("[GAME END] Exiting the game loop...")
+                    break
+                send_move(client_socket, move)
+            else:
+                print("[WAIT] Waiting for the opponent's move...")
 
         except Exception as e:
             print(f"[ERROR] Failed to process game state: {e}")

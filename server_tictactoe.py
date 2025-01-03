@@ -41,12 +41,20 @@ def handle_client(connection, addr, active_connections,clients):
     if connection not in CLIENT_MARKERS:
         available_markers = [marker for marker in PLAYER_MARKERS if marker not in CLIENT_MARKERS.values()]
         if available_markers:
-            CLIENT_MARKERS[connection] = available_markers[0]
-            print(f"[ASSIGN] Assigned marker '{CLIENT_MARKERS[connection]}' to client {addr}")
+            marker = available_markers[0]
+            CLIENT_MARKERS[connection] = marker  # Assign marker
+
         else:
             print(f"[ERROR] No markers available for client {addr}")
+            connection.send("[SERVER] No markers available, disconnecting.".encode(FORMAT))
             connection.close()
             return  # Close connection if no markers are available
+    else:
+            marker = CLIENT_MARKERS[connection]  # Retrieve existing marker
+
+    # Send the assigned marker
+    connection.send(marker.encode(FORMAT))  # Send the assigned marker
+    print(f"[ASSIGN] Assigned marker '{CLIENT_MARKERS[connection]}' to client {addr}")
 
     try:
         while connected:
@@ -91,19 +99,43 @@ def handle_client(connection, addr, active_connections,clients):
                 # Broadcast the initial game state
                 broadcast_update(clients, game_data["board"], game_data["next_turn"], "ongoing", winner=None)
                 continue  # Continue to the next iteration to wait for moves
+            
+            # Handle move commands (e.g., "1,2")
+            elif ',' in msg:
+                try:
+                    move = tuple(map(int, msg.split(',')))  # Parse move as (row, col)
+                    current_player = CLIENT_MARKERS[connection]
+
+                    # Validate the move
+                    is_valid, validation_msg = validate_move(game_state, move)
+                    if not is_valid:
+                        connection.send(f"[ERROR] Invalid move: {validation_msg}".encode(FORMAT))
+                        continue
+
+                    # Update the game state
+                    players = list(CLIENT_MARKERS.values())
+                    game_data = update_game_data(game_state, move, current_player, players)
+
+                    # Broadcast the updated game state
+                    broadcast_update(clients, game_data["board"], game_data["next_turn"], game_data["status"], game_data["winner"])
+
+                    # Check for game end conditions
+                    if game_data["status"] == "win":
+                        print(f"[GAME END] Player '{game_data['winner']}' has won!")
+                        break
+                    elif game_data["status"] == "draw":
+                        print("[GAME END] The game is a draw!")
+                        break
+
+                except ValueError:
+                    connection.send("[ERROR] Invalid move format. Use 'row,col'.".encode(FORMAT))
+                    continue
 
         # Handle other messages (e.g., chat messages)
         print(f"[CHAT] {addr} says: {msg}")
         connection.send(f"[SERVER RESPONSE] Message received: {msg}".encode(FORMAT))
-        
-            # # Process moves only if the game has started
-            # if game_state:
-            #     # Here we can add logic to process moves (e.g., update the game state)
-            #     response = f"Server received your move: {msg}"  # Placeholder response
-            #     connection.send(response.encode(FORMAT))
-            # else:
-            #     connection.send("Game has not started yet. Send 'start' to begin.".encode(FORMAT))
-        
+
+
     except ConnectionResetError:
         print(f"[ERROR] Connection with {addr} reset unexpectedly.")
     finally:
@@ -158,16 +190,18 @@ def update_game_data(game_state, move, current_player, players):
     Returns:
         dict: Updated game data including the board, next turn, status, and winner.
     """
-    #row, col = move
-    #game_state[row][col] = current_player  # Update the board with the current player's marker
+    if move is None:
+        next_turn = players[0]  # First player's turn at game start
 
-    # Check the game status
-    #status, winner = check_winner(game_state, players)
+    else:
+        # Process the move
+        row, col = move
+        game_state[row][col] = current_player
 
-    # Determine the next turn
-    next_turn_index = (players.index(current_player) + 1) % len(players)
-    next_turn = players[next_turn_index]
-
+        # Determine the next turn
+        next_turn_index = (players.index(current_player) + 1) % len(players)
+        next_turn = players[next_turn_index]
+    
     # Prepare the game data
     game_data = {
         "board": game_state,
