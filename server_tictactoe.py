@@ -6,13 +6,15 @@ HOST = '127.0.0.1'  # Standard loopback IP address (localhost)
 PORT = 5000  # Port to listen on (non-privileged ports are > 1023)
 FORMAT = 'utf-8'  # Define the encoding format of messages from client-server
 ADDR = (HOST, PORT)  # Creating a tuple of IP+PORT
+PLAYER_MARKERS = ["X", "O", "Δ", "☆", "♠", "♣", "♥", "♦", "♪", "♫"] # Define player markers 
+CLIENT_MARKERS = {}  # Maps client connections to their assigned markers
 
 def start_server():
     # Step 1: Bind and start listening
     server_socket.bind(ADDR)
     print(f"[LISTENING] Server is listening on {HOST}:{PORT}")
     server_socket.listen()
-    
+
     active_connections = 0  # Counter for active connections
     clients = []  # List to store connected clients
     
@@ -35,6 +37,17 @@ def handle_client(connection, addr, active_connections,clients):
     connected = True
     game_state = None  # Initialize game_state as None until 'start' is received
 
+    # Assign a marker to the new client
+    if connection not in CLIENT_MARKERS:
+        available_markers = [marker for marker in PLAYER_MARKERS if marker not in CLIENT_MARKERS.values()]
+        if available_markers:
+            CLIENT_MARKERS[connection] = available_markers[0]
+            print(f"[ASSIGN] Assigned marker '{CLIENT_MARKERS[connection]}' to client {addr}")
+        else:
+            print(f"[ERROR] No markers available for client {addr}")
+            connection.close()
+            return  # Close connection if no markers are available
+
     try:
         while connected:
             # Step 1: Receive a move or command from the client
@@ -51,6 +64,7 @@ def handle_client(connection, addr, active_connections,clients):
                 print(f"[DISCONNECT] {addr} disconnected.")
                 connected = False
                 active_connections -=1
+                CLIENT_MARKERS.pop(connection, None)  # Remove the client's marker
                 break
 
 
@@ -67,14 +81,21 @@ def handle_client(connection, addr, active_connections,clients):
                         print(f"[BROADCAST] Sent 'game started' message to client: {client}")
                     except Exception as e:
                         print(f"[ERROR] Failed to send 'game started' message to client: {e}")
-                broadcast_update(clients, game_state, next_turn=None, status="ongoing", winner=None)
+                
+                # Prepare the players list
+                players = list(CLIENT_MARKERS.values())
+
+                # Call update_game_data to set the initial state
+                game_data = update_game_data(game_state, move=None, current_player=players[0], players=players)
+                
+                # Broadcast the initial game state
+                broadcast_update(clients, game_data["board"], game_data["next_turn"], "ongoing", winner=None)
                 continue  # Continue to the next iteration to wait for moves
 
         # Handle other messages (e.g., chat messages)
         print(f"[CHAT] {addr} says: {msg}")
         connection.send(f"[SERVER RESPONSE] Message received: {msg}".encode(FORMAT))
-
-
+        
             # # Process moves only if the game has started
             # if game_state:
             #     # Here we can add logic to process moves (e.g., update the game state)
@@ -144,18 +165,79 @@ def update_game_data(game_state, move, current_player, players):
     #status, winner = check_winner(game_state, players)
 
     # Determine the next turn
-    #next_turn_index = (players.index(current_player) + 1) % len(players)
-    #next_turn = players[next_turn_index]
+    next_turn_index = (players.index(current_player) + 1) % len(players)
+    next_turn = players[next_turn_index]
 
     # Prepare the game data
     game_data = {
         "board": game_state,
-        #"next_turn": next_turn, 
+        "next_turn": next_turn, 
         #"status": status, 
         #"winner": winner,  
     }
 
     return game_data
+
+def validate_move(game_state, move):
+    """
+    Validates a move sent by a client.
+
+    Args:
+        game_state (list of list): The current game board.
+        move (tuple): The player's move as (row, col).
+
+    Returns:
+        bool: True if the move is valid, False otherwise.
+        str: An error message if the move is invalid.
+    """
+    row, col = move
+    board_size = len(game_state)
+
+    # Check if the move is within bounds
+    if not (0 <= row < board_size and 0 <= col < board_size):
+        return False, "Move is out of bounds."
+
+    # Check if the cell is empty
+    if game_state[row][col] != "":
+        return False, "Cell is already occupied."
+
+    return True, "Move is valid."
+
+def check_winner(game_state, players):
+    """
+    Checks the game board to determine if there's a winner or if the game is a draw.
+
+    Args:
+        game_state (list of list): The current game board.
+        players (list): List of player markers (e.g., ["X", "O", "Δ"]).
+
+    Returns:
+        str: The status of the game ("win", "draw", "ongoing").
+        str or None: The winning player, if any.
+    """
+    board_size = len(game_state)
+
+    # Check rows and columns for a winner
+    for i in range(board_size):
+        # Check row
+        if all(cell == game_state[i][0] and cell != "" for cell in game_state[i]):
+            return "win", game_state[i][0]
+        # Check column
+        if all(row[i] == game_state[0][i] and row[i] != "" for row in game_state):
+            return "win", game_state[0][i]
+
+    # Check diagonals for a winner
+    if all(game_state[i][i] == game_state[0][0] and game_state[i][i] != "" for i in range(board_size)):
+        return "win", game_state[0][0]
+    if all(game_state[i][board_size - i - 1] == game_state[0][board_size - 1] and game_state[i][board_size - i - 1] != "" for i in range(board_size)):
+        return "win", game_state[0][board_size - 1]
+
+    # Check for a draw (no empty cells)
+    if all(cell != "" for row in game_state for cell in row):
+        return "draw", None
+
+    return "ongoing", None
+
 
 # Main
 if __name__ == '__main__':
