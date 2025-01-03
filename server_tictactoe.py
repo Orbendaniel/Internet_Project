@@ -8,7 +8,6 @@ FORMAT = 'utf-8'  # Define the encoding format of messages from client-server
 ADDR = (HOST, PORT)  # Creating a tuple of IP+PORT
 PLAYER_MARKERS = ["X", "O", "Δ", "☆", "♠", "♣", "♥", "♦", "♪", "♫"] # Define player markers 
 CLIENT_MARKERS = {}  # Maps client connections to their assigned markers
-active_connections=0
 
 def start_server():
     # Step 1: Bind and start listening
@@ -75,7 +74,6 @@ def handle_client(connection, addr, active_connections,clients):
                 print(f"[DISCONNECT] {addr} disconnected.")
                 connected = False
                 active_connections -=1
-                clients.pop()
                 CLIENT_MARKERS.pop(connection, None)  # Remove the client's marker
                 break
 
