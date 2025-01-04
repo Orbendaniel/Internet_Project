@@ -89,6 +89,11 @@ def receive_game_update(client_socket):
         if not update:
             print("[ERROR] Lost connection to the server.")
             return None
+        # Validate that the received update is in the expected format
+        if not update.startswith("{") or not update.endswith("}"):
+            print("[ERROR] Received malformed game update.")
+            return None
+        #if the update was received correctly, return the update
         return update
     except ConnectionResetError:
         print("[ERROR] Connection to the server was reset.")
@@ -118,13 +123,13 @@ def play_game(client_socket,player_marker):
             # Step 3: Display the updated game board
             display_board(game_state)
 
-            # Step 4: Check game status
-            # if status == "win":
-            #     print(f"[GAME OVER] {winner} wins!")
-            #     break
-            # elif status == "draw":
-            #     print("[GAME OVER] It's a draw!")
-            #     break
+            #Step 4: Check game status
+            if status == "win":
+                print(f"[GAME OVER] {winner} wins!")
+                break
+            elif status == "draw":
+                print("[GAME OVER] It's a draw!")
+                break
 
             # Step 5: Handle the player's turn
             if next_turn == player_marker:  
