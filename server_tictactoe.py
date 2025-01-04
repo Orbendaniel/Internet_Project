@@ -1,5 +1,6 @@
 import socket
 import threading
+import time
 
 # GLOBAL VARIABLES 
 HOST = '127.0.0.1'  # Standard loopback IP address (localhost)
@@ -116,6 +117,7 @@ def handle_client(connection, addr, active_connections,clients):
                     # Update the game state
                     players = list(CLIENT_MARKERS.values())
                     game_data = update_game_data(game_state, move, current_player, players)
+
                     # Broadcast the updated game state
                     broadcast_update(clients, game_data["board"], game_data["next_turn"], game_data["status"], game_data["winner"])
 
@@ -130,6 +132,10 @@ def handle_client(connection, addr, active_connections,clients):
                 except ValueError:
                     connection.send("[ERROR] Invalid move format. Use 'row,col'.".encode(FORMAT))
                     continue
+
+                except Exception as e:
+                    print(f"[ERROR] Unexpected error while processing move: {e}")
+                    continue  # Ensure the game loop continues
 
 
 
@@ -165,6 +171,8 @@ def broadcast_update(clients, game_state, next_turn, status, winner=None):
     update_message = repr(game_data)
     print(f"[DEBUG] Sending game data: {update_message}")  # Debugging
 
+    # Introduce a small delay to ensure clients have time to receive the broadcast
+    time.sleep(2)  # Adjust the delay as necessary
 
     # Send the game data to all connected clients
     for client in clients:
@@ -173,6 +181,8 @@ def broadcast_update(clients, game_state, next_turn, status, winner=None):
             print(f"[BROADCAST] Sent game update to client: {client}")
         except Exception as e:
             print(f"[ERROR] Failed to send game update to client: {e}")
+
+        
 
 def update_game_data(game_state, move, current_player, players):
     """
