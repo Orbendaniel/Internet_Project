@@ -34,7 +34,7 @@ def connect_to_server(host, port):
     Establishes a connection to the server and allows continuous communication.
     """
     global game_active  # Access the global variable
-    
+
     # Step 1: Create a socket
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -57,9 +57,10 @@ def connect_to_server(host, port):
     listener_thread.start()
 
     try:
-        while True:
-            if not game_active:
-                # Step 1: Take input from the user , Allow non-game messages only if the game has not started
+        print(game_active)
+        while not game_active:
+                # Step 1: Take input from the user
+                # Allow non-game messages only if the game has not started
                 message = input("write 'start' to begin the game, 'quit' to disconnect, or any other message to communicate:\n")
                 client_socket.send(message.encode(FORMAT))
 
@@ -67,7 +68,7 @@ def connect_to_server(host, port):
                 if message.lower() == "quit":
                     print("[DISCONNECT] Closing connection.")
                     break
-
+        print("[INFO] Game is active. You can no longer send non-game messages.")
     except ConnectionResetError:
         print("[ERROR] Server disconnected unexpectedly.")
     finally:
