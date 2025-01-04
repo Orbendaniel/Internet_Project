@@ -64,6 +64,7 @@ def connect_to_server(host, port):
 
                     # Step 2: Prevent sending non-game messages while the game is active
                     if not game_active_event.is_set():
+
                         client_socket.send(message.encode(FORMAT))
             
                     # Step 3: Handle 'quit' command
@@ -74,8 +75,7 @@ def connect_to_server(host, port):
                     # If the game is active, wait for it to finish
                     if game_active_event.is_set():
                         game_active_event.wait()
-                        print("[INFO] Game logic finished. Returning to communication mode.")
-                    
+
     except ConnectionResetError:
         print("[ERROR] Server disconnected unexpectedly.")
     finally:

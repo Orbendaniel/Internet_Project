@@ -124,14 +124,8 @@ def handle_client(connection, addr, active_connections,clients):
                     print(game_state)
                     # Broadcast the updated game state
                     broadcast_update(clients, game_data["board"], game_data["next_turn"], game_data["status"], game_data["winner"])
-                    move = None
-                    # # Check for game end conditions
-                    # if game_data["status"] == "win":
-                    #     print(f"[GAME END] Player '{game_data['winner']}' has won!")
-                    #     break
-                    # elif game_data["status"] == "draw":
-                    #     print("[GAME END] The game is a draw!")
-                    #     break
+                    move = None #clear move for next turn
+
 
                 except ValueError:
                     connection.send("[ERROR] Invalid move format. Use 'row,col'.".encode(FORMAT))
@@ -185,8 +179,6 @@ def broadcast_update(clients, game_state, next_turn, status, winner=None):
             print(f"[BROADCAST] Sent game update to client: {client}")
         except Exception as e:
             print(f"[ERROR] Failed to send game update to client: {e}")
-
-        
 
 def update_game_data(game_state, move, current_player, players):
     """
@@ -266,27 +258,34 @@ def check_winner(game_state, players):
     """
     board_size = len(game_state)
 
-    # Check rows and columns for a winner
-    for i in range(board_size):
-        # Check row
-        if all(cell == game_state[i][0] and cell != "" for cell in game_state[i]):
-            return "win", game_state[i][0]
-        # Check column
-        if all(row[i] == game_state[0][i] and row[i] != "" for row in game_state):
-            return "win", game_state[0][i]
+    # Check rows for a winner
+    for row in game_state:
+        for i in range(board_size - 2):  # Stop 2 cells before the end
+            if row[i] == row[i + 1] == row[i + 2] != "":  # Check for 3 consecutive cells
+                return "win", row[i]
+
+    # Check columns for a winner
+    for col in range(board_size):
+        for i in range(board_size - 2):  # Stop 2 cells before the end
+            if game_state[i][col] == game_state[i + 1][col] == game_state[i + 2][col] != "":
+                return "win", game_state[i][col]
 
     # Check diagonals for a winner
-    if all(game_state[i][i] == game_state[0][0] and game_state[i][i] != "" for i in range(board_size)):
-        return "win", game_state[0][0]
-    if all(game_state[i][board_size - i - 1] == game_state[0][board_size - 1] and game_state[i][board_size - i - 1] != "" for i in range(board_size)):
-        return "win", game_state[0][board_size - 1]
+    for i in range(board_size - 2):  # Stop 2 cells before the end
+        for j in range(board_size - 2):  # Stop 2 cells before the end
+            # Check diagonal top-left to bottom-right
+            if game_state[i][j] == game_state[i + 1][j + 1] == game_state[i + 2][j + 2] != "":
+                return "win", game_state[i][j]
+            # Check diagonal top-right to bottom-left
+            if game_state[i][j + 2] == game_state[i + 1][j + 1] == game_state[i + 2][j] != "":
+                return "win", game_state[i][j + 2]
 
     # Check for a draw (no empty cells)
     if all(cell != "" for row in game_state for cell in row):
         return "draw", None
 
+    # If no winner or draw, the game is still ongoing
     return "ongoing", None
-
 
 # Main
 if __name__ == '__main__':
