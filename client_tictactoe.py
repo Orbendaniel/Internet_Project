@@ -33,6 +33,8 @@ def connect_to_server(host, port):
     """
     Establishes a connection to the server and allows continuous communication.
     """
+    global game_active  # Access the global variable
+    
     # Step 1: Create a socket
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 

@@ -172,7 +172,7 @@ def broadcast_update(clients, game_state, next_turn, status, winner=None):
     print(f"[DEBUG] Sending game data: {update_message}")  # Debugging
 
     # Introduce a small delay to ensure clients have time to receive the broadcast
-    time.sleep(2)  # Adjust the delay as necessary
+    time.sleep(0.1)  # Adjust the delay as necessary
 
     # Send the game data to all connected clients
     for client in clients:
