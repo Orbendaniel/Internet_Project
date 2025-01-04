@@ -89,10 +89,6 @@ def receive_game_update(client_socket):
         if not update:
             print("[ERROR] Lost connection to the server.")
             return None
-        # Validate that the received update is in the expected format
-        if not update.startswith("{") or not update.endswith("}"):
-            print("[ERROR] Received malformed game update.")
-            return None
         #if the update was received correctly, return the update
         return update
     except ConnectionResetError:
