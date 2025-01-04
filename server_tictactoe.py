@@ -9,6 +9,8 @@ FORMAT = 'utf-8'  # Define the encoding format of messages from client-server
 ADDR = (HOST, PORT)  # Creating a tuple of IP+PORT
 PLAYER_MARKERS = ["X", "O", "Δ", "☆", "♠", "♣", "♥", "♦", "♪", "♫"] # Define player markers 
 CLIENT_MARKERS = {}  # Maps client connections to their assigned markers
+game_state = None  # Global game state
+game_state_lock = threading.Lock()  # Global lock for synchronizing game_state access
 
 def start_server():
     # Step 1: Bind and start listening
@@ -34,9 +36,9 @@ def start_server():
         thread.start()
 
 def handle_client(connection, addr, active_connections,clients):
+    global game_state  # Access the global game state
     print(f"[HANDLING CLIENT] {addr}")
     connected = True
-    game_state = None  # Initialize game_state as None until 'start' is received
 
     # Assign a marker to the new client
     if connection not in CLIENT_MARKERS:
@@ -61,14 +63,14 @@ def handle_client(connection, addr, active_connections,clients):
         while connected:
             # Step 1: Receive a move or command from the client
             msg = connection.recv(1024).decode(FORMAT)
-
+            print(f"[DEBUG] Received message from client: {msg}")
             if not msg:
                 print(f"[DISCONNECT] Empty message received. Closing connection to {addr}")
                 break
             
             # Handle other messages (e.g., chat messages)
-            print(f"[CHAT] {addr} says: {msg}")
-            connection.send(f"[SERVER RESPONSE] Message received: {msg}".encode(FORMAT))
+            if not ',' in msg: 
+                print(f"[CHAT] {addr} says: {msg}")
 
             # Step 2: Process the client's command
             if msg.lower() == 'quit':
@@ -107,20 +109,22 @@ def handle_client(connection, addr, active_connections,clients):
                 try:
                     move = tuple(map(int, msg.split(',')))  # Parse move as (row, col)
                     current_player = CLIENT_MARKERS[connection]
-
+                    print(f"[DEBUG] Parsed move: {move}")
                     # Validate the move
                     is_valid, validation_msg = validate_move(game_state, move)
                     if not is_valid:
                         connection.send(f"[ERROR] Invalid move: {validation_msg}".encode(FORMAT))
                         continue
-
+                    print("[DEBUG] validate_move COMPLETE")
                     # Update the game state
                     players = list(CLIENT_MARKERS.values())
                     game_data = update_game_data(game_state, move, current_player, players)
-
+                    print("[DEBUG] update_game_data COMPLETE")
+                    game_state = game_data['board']  # Assign the updated board back to game_state
+                    print(game_state)
                     # Broadcast the updated game state
                     broadcast_update(clients, game_data["board"], game_data["next_turn"], game_data["status"], game_data["winner"])
-
+                    move = None
                     # # Check for game end conditions
                     # if game_data["status"] == "win":
                     #     print(f"[GAME END] Player '{game_data['winner']}' has won!")
@@ -237,7 +241,7 @@ def validate_move(game_state, move):
     """
     row, col = move
     board_size = len(game_state)
-
+    print(f"[DEBUG] Validating move: {move}")
     # Check if the move is within bounds
     if not (0 <= row < board_size and 0 <= col < board_size):
         return False, "Move is out of bounds."

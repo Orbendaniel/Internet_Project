@@ -3,13 +3,12 @@ import threading
 HOST = '127.0.0.1'  # Replace with the server's IP if needed
 PORT = 5000  # Replace with the server's port if needed
 FORMAT = 'utf-8'
-game_active = False  # Global variable to track game status
+game_active_event = threading.Event()  # Shared event for game state
 
 def listen_to_server(client_socket, player_marker):
     """
     Continuously listens for messages from the server.
     """
-    global game_active  # Access the global variable
     while True:
         try:
             response = receive_game_update(client_socket)
@@ -20,10 +19,10 @@ def listen_to_server(client_socket, player_marker):
             # Check for "game started" message
             if "game started" in response.lower():
                 print("[INFO] Game has started! Entering game loop...")
-                game_active = True  # Mark the game as active
+                game_active_event.set()  # Signal that the game is active
                 play_game(client_socket,player_marker)  # Automatically enter the game loop
                 print("[GAME ENDED] Returning to communication loop.")
-                game_active = False  # Reset game state after loop ends
+                game_active_event.clear()  # Reset game state after loop ends
 
         except Exception as e:
             print(f"[ERROR] An error occurred while listening to the server: {e}")
@@ -33,7 +32,6 @@ def connect_to_server(host, port):
     """
     Establishes a connection to the server and allows continuous communication.
     """
-    global game_active  # Access the global variable
 
     # Step 1: Create a socket
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -57,18 +55,27 @@ def connect_to_server(host, port):
     listener_thread.start()
 
     try:
-        print(game_active)
-        while not game_active:
-                # Step 1: Take input from the user
-                # Allow non-game messages only if the game has not started
-                message = input("write 'start' to begin the game, 'quit' to disconnect, or any other message to communicate:\n")
-                client_socket.send(message.encode(FORMAT))
+        print(f"[DEBUG] Initial game_active state: {game_active_event.is_set()}")
+        while True:
+                if not game_active_event.is_set():
+                    # Step 1: Take input from the user
+                    # Allow non-game messages only if the game has not started
+                    message = input("write 'start' to begin the game, 'quit' to disconnect, or any other message to communicate:\n")
 
-            # Step 2: Handle 'quit' command
-                if message.lower() == "quit":
-                    print("[DISCONNECT] Closing connection.")
-                    break
-        print("[INFO] Game is active. You can no longer send non-game messages.")
+                    # Step 2: Prevent sending non-game messages while the game is active
+                    if not game_active_event.is_set():
+                        client_socket.send(message.encode(FORMAT))
+            
+                    # Step 3: Handle 'quit' command
+                    if message.lower() == "quit":
+                        print("[DISCONNECT] Closing connection.")
+                        break
+            
+                    # If the game is active, wait for it to finish
+                    if game_active_event.is_set():
+                        game_active_event.wait()
+                        print("[INFO] Game logic finished. Returning to communication mode.")
+                    
     except ConnectionResetError:
         print("[ERROR] Server disconnected unexpectedly.")
     finally:
