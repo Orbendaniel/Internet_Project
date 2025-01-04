@@ -3,11 +3,13 @@ import threading
 HOST = '127.0.0.1'  # Replace with the server's IP if needed
 PORT = 5000  # Replace with the server's port if needed
 FORMAT = 'utf-8'
+game_active = False  # Global variable to track game status
 
 def listen_to_server(client_socket, player_marker):
     """
     Continuously listens for messages from the server.
     """
+    global game_active  # Access the global variable
     while True:
         try:
             response = receive_game_update(client_socket)
@@ -18,8 +20,10 @@ def listen_to_server(client_socket, player_marker):
             # Check for "game started" message
             if "game started" in response.lower():
                 print("[INFO] Game has started! Entering game loop...")
+                game_active = True  # Mark the game as active
                 play_game(client_socket,player_marker)  # Automatically enter the game loop
                 print("[GAME ENDED] Returning to communication loop.")
+                game_active = False  # Reset game state after loop ends
 
         except Exception as e:
             print(f"[ERROR] An error occurred while listening to the server: {e}")
@@ -52,14 +56,16 @@ def connect_to_server(host, port):
 
     try:
         while True:
-            # Step 1: Take input from the user
-            message = input("write 'start' to begin the game, 'quit' to disconnect, or any other message to communicate:\n")
-            client_socket.send(message.encode(FORMAT))
+            if not game_active:
+                # Step 1: Take input from the user , Allow non-game messages only if the game has not started
+                message = input("write 'start' to begin the game, 'quit' to disconnect, or any other message to communicate:\n")
+                client_socket.send(message.encode(FORMAT))
 
             # Step 2: Handle 'quit' command
-            if message.lower() == 'quit':
-                print("[DISCONNECT] Closing connection.")
-                break
+                if message.lower() == "quit":
+                    print("[DISCONNECT] Closing connection.")
+                    break
+
     except ConnectionResetError:
         print("[ERROR] Server disconnected unexpectedly.")
     finally:
@@ -89,6 +95,7 @@ def receive_game_update(client_socket):
         if not update:
             print("[ERROR] Lost connection to the server.")
             return None
+
         #if the update was received correctly, return the update
         return update
     except ConnectionResetError:
@@ -104,6 +111,7 @@ def play_game(client_socket,player_marker):
     while True:
         # Step 1: Receive the current game state from the server
         update = receive_game_update(client_socket)
+        print(f"[DEBUG] Received raw game update: {update}")
         if update is None:
             print("[INFO] Closing the game due to server connection loss.")
             break
