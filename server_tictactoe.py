@@ -116,17 +116,16 @@ def handle_client(connection, addr, active_connections,clients):
                     # Update the game state
                     players = list(CLIENT_MARKERS.values())
                     game_data = update_game_data(game_state, move, current_player, players)
-
                     # Broadcast the updated game state
                     broadcast_update(clients, game_data["board"], game_data["next_turn"], game_data["status"], game_data["winner"])
 
-                    # Check for game end conditions
-                    if game_data["status"] == "win":
-                        print(f"[GAME END] Player '{game_data['winner']}' has won!")
-                        break
-                    elif game_data["status"] == "draw":
-                        print("[GAME END] The game is a draw!")
-                        break
+                    # # Check for game end conditions
+                    # if game_data["status"] == "win":
+                    #     print(f"[GAME END] Player '{game_data['winner']}' has won!")
+                    #     break
+                    # elif game_data["status"] == "draw":
+                    #     print("[GAME END] The game is a draw!")
+                    #     break
 
                 except ValueError:
                     connection.send("[ERROR] Invalid move format. Use 'row,col'.".encode(FORMAT))
@@ -163,7 +162,7 @@ def broadcast_update(clients, game_state, next_turn, status, winner=None):
     }
 
     # Convert the game data to a string for transmission
-    update_message = str(game_data)
+    update_message = repr(game_data)
     print(f"[DEBUG] Sending game data: {update_message}")  # Debugging
 
 
@@ -190,6 +189,7 @@ def update_game_data(game_state, move, current_player, players):
     """
     if move is None:
         next_turn = players[0]  # First player's turn at game start
+        status, winner = "ongoing", None  # Default values at game start
 
     else:
         # Process the move
@@ -199,13 +199,16 @@ def update_game_data(game_state, move, current_player, players):
         # Determine the next turn
         next_turn_index = (players.index(current_player) + 1) % len(players)
         next_turn = players[next_turn_index]
-    
+
+        # Check the game status
+        status, winner = check_winner(game_state, players)
+
     # Prepare the game data
     game_data = {
         "board": game_state,
         "next_turn": next_turn, 
-        #"status": status, 
-        #"winner": winner,  
+        "status": status, 
+        "winner": winner,  
     }
 
     return game_data
@@ -235,7 +238,7 @@ def validate_move(game_state, move):
 
     return True, "Move is valid."
 
-def check_winner(game_state, players):
+def check_winner(game_state, players):  
     """
     Checks the game board to determine if there's a winner or if the game is a draw.
 
