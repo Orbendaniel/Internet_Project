@@ -113,15 +113,24 @@ def handle_client(connection, addr, active_connections,clients):
                     # Validate the move
                     is_valid, validation_msg = validate_move(game_state, move)
                     if not is_valid:
-                        connection.send(f"[ERROR] Invalid move: {validation_msg}".encode(FORMAT))
-                        continue
-                    print("[DEBUG] validate_move COMPLETE")
-                    # Update the game state
-                    players = list(CLIENT_MARKERS.values())
-                    game_data = update_game_data(game_state, move, current_player, players)
-                    print("[DEBUG] update_game_data COMPLETE")
-                    game_state = game_data['board']  # Assign the updated board back to game_state
-                    print(game_state)
+                        print(f"Player {current_player} [ERROR] Invalid move: {validation_msg} skipping turn!")
+                        move=None;
+                        print("[DEBUG] validate_move COMPLETE")
+                        players = list(CLIENT_MARKERS.values())
+                        game_data = update_game_data(game_state, move, current_player, players)
+                        print("[DEBUG] update_game_data COMPLETE")
+                        game_state = game_data['board']  # Assign the updated board back to game_state
+                        print(game_state)
+                        
+                    if is_valid:
+                        print("[DEBUG] validate_move COMPLETE")
+                        # Update the game state
+                        players = list(CLIENT_MARKERS.values())
+                        game_data = update_game_data(game_state, move, current_player, players)
+                        print("[DEBUG] update_game_data COMPLETE")
+                        game_state = game_data['board']  # Assign the updated board back to game_state
+                        print(game_state)
+
                     # Broadcast the updated game state
                     broadcast_update(clients, game_data["board"], game_data["next_turn"], game_data["status"], game_data["winner"])
                     move = None #clear move for next turn
@@ -143,7 +152,6 @@ def handle_client(connection, addr, active_connections,clients):
         # Step 3: Clean up the connection
         connection.close()
         print(f"[CONNECTION CLOSED] {addr}")
-
 
 def broadcast_update(clients, game_state, next_turn, status, winner=None):
     """
@@ -193,11 +201,20 @@ def update_game_data(game_state, move, current_player, players):
     Returns:
         dict: Updated game data including the board, next turn, status, and winner.
     """
-    if move is None:
+    #when the game just starts
+    if move is None and current_player==players[0]:
         next_turn = players[0]  # First player's turn at game start
         status, winner = "ongoing", None  # Default values at game start
 
-    else:
+    #when move is not valid skip turn 
+    if move is None and current_player!=players[0]: 
+        next_turn_index = (players.index(current_player) + 1) % len(players)
+        next_turn = players[next_turn_index]   
+        
+        # Check the game status
+        status, winner = check_winner(game_state, players)
+
+    if move is not None:
         # Process the move
         row, col = move
         game_state[row][col] = current_player
@@ -219,7 +236,7 @@ def update_game_data(game_state, move, current_player, players):
 
     return game_data
 
-def validate_move(game_state, move):
+def validate_move(game_state, move): 
     """
     Validates a move sent by a client.
 
