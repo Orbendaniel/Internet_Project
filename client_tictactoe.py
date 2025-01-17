@@ -30,10 +30,7 @@ def listen_to_server(client_socket, player_marker):
             if response.lower() == "quit": 
                 break
 
-        except Exception as e:
-            # Avoid excessive error messages if the socket is already closed
-            if not listener_stop_event.is_set():
-                print(f"[ERROR] An error occurred while listening to the server: {e}")
+        except Exception:
             break
 
 def connect_to_server(host, port):
@@ -64,9 +61,10 @@ def connect_to_server(host, port):
             print("\n[INFO] Welcome! Choose an option:")
             print("1. Start a new game lobby")
             print("2. Join an existing game lobby")
-            
+            print("3. Quit")
+
             # Get client input
-            choice = input("Enter your choice (1 or 2): ").strip()
+            choice = input("Enter your choice (1,2,3): ").strip()
 
             if choice == "1":
                 client_socket.send(choice.encode(FORMAT))
@@ -89,8 +87,15 @@ def connect_to_server(host, port):
                 else:
                     print("[INFO] No active lobbies to join.")
 
+            elif choice == "3":
+                print("[DISCONNECT] Exiting server.")
+                client_socket.send(choice.encode(FORMAT))  # Inform server of disconnection
+                client_socket.close()
+                listener_stop_event.set()  # Signal the listener thread to stop
+                return  # Exit the function and disconnect the client
+
             else:
-                print("[ERROR] Invalid choice. Please enter 1 or 2.")
+                print("[ERROR] Invalid choice. Please enter 1, 2, or 3.")
 
     except Exception as e:
         print(f"[ERROR] An error occurred during the lobby setup: {e}")
@@ -130,7 +135,7 @@ def connect_to_server(host, port):
     finally:
         listener_stop_event.set()  # Ensure the thread stops
         listener_thread.join()     # Wait for the listener thread to exit
-        client_socket.close() #Ensure the client socket is closed
+        client_socket.close()      #Ensure the client socket is closed
 
 def send_move(client_socket, move):
     """

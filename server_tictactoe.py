@@ -13,8 +13,10 @@ game_state = None  # Global game state
 game_state_lock = threading.Lock()  # Global lock for synchronizing game_state access
 lobbies = {}  # Dictionary to manage multiple game lobbies
 lobby_counter = 1  # Counter for naming new lobbies
+active_connections = 0  # Counter for active connections
 
 def start_server():
+    global active_connections  # Access the global active_connections counter
     # Step 1: Bind and start listening
     server_socket.bind(ADDR)
     print(f"[LISTENING] Server is listening on {HOST}:{PORT}")
@@ -34,12 +36,13 @@ def start_server():
         print(f"[ACTIVE CONNECTIONS] {active_connections}")
         
         # Step 3: Handle client in a new thread
-        thread = threading.Thread(target=handle_client, args=(connection, address,active_connections,clients))
+        thread = threading.Thread(target=handle_client, args=(connection, address,clients))
         thread.start()
 
-def handle_client(connection, addr, active_connections,clients):
+def handle_client(connection, addr,clients):
     global game_state  # Access the global game state
     global lobbies, lobby_counter # Access the global lobby dictionary and lobby lobby counter  
+    global active_connections  # Access the global active_connections counter
     print(f"[HANDLING CLIENT] {addr}")
     connected = True
 
@@ -64,7 +67,7 @@ def handle_client(connection, addr, active_connections,clients):
 
     # Pre-Lobby Logic: Ask the client to choose or create a lobby
     try:
-        while True:  # Pre-lobby loop
+        while connected: # Pre-lobby loop
             # Receive the client's choice
             choice = connection.recv(1024).decode(FORMAT).strip()
             if choice == "1":
@@ -99,9 +102,17 @@ def handle_client(connection, addr, active_connections,clients):
                         break  # Exit pre-lobby loop
                     else:
                         connection.send("[ERROR] Lobby not found. Try again.\n".encode(FORMAT))
-
+            elif choice == "3":
+                print(f"[DISCONNECT] {addr} disconnected.")
+                connection.send("quit".encode(FORMAT)) #sends a quit signal to the client
+                connected = False
+                active_connections -=1
+                CLIENT_MARKERS.pop(connection, None)  # Remove the client's marker
+                connection.close()
+                print(f"[ACTIVE CONNECTIONS] {active_connections}")
+                
             else:
-                connection.send("[ERROR] Invalid choice. Please enter 1 or 2.\n".encode(FORMAT))
+                connection.send("[ERROR] Invalid choice. Please enter 1,2 or 3.\n".encode(FORMAT))
 
     except Exception as e:
         print(f"[ERROR] An error occurred while handling client pre-lobby: {e}")
@@ -141,7 +152,8 @@ def handle_client(connection, addr, active_connections,clients):
                     if not lobbies[lobby_name]["clients"]:  # If the lobby is empty, remove it
                         del lobbies[lobby_name]
                         print(f"[LOBBY DELETED] {lobby_name} deleted as it became empty.")
-
+                connection.close()
+                print(f"[ACTIVE CONNECTIONS] {active_connections}")
                 break
 
             if msg.lower() == 'start':
