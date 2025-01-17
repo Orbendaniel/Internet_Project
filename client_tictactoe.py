@@ -4,12 +4,14 @@ HOST = '127.0.0.1'  # Replace with the server's IP if needed
 PORT = 5000  # Replace with the server's port if needed
 FORMAT = 'utf-8'
 game_active_event = threading.Event()  # Shared event for game state
+in_lobby_event = threading.Event() # threading event for lobby state
+listener_stop_event = threading.Event() # threading event for listen state
 
 def listen_to_server(client_socket, player_marker):
     """
     Continuously listens for messages from the server.
     """
-    while True:
+    while not listener_stop_event.is_set():
         try:
             response = receive_game_update(client_socket)
             if not response:
@@ -24,8 +26,14 @@ def listen_to_server(client_socket, player_marker):
                 print("[GAME ENDED] Returning to communication loop.")
                 game_active_event.clear()  # Reset game state after loop ends
 
+            #Handle quit messages      
+            if response.lower() == "quit": 
+                break
+
         except Exception as e:
-            print(f"[ERROR] An error occurred while listening to the server: {e}")
+            # Avoid excessive error messages if the socket is already closed
+            if not listener_stop_event.is_set():
+                print(f"[ERROR] An error occurred while listening to the server: {e}")
             break
 
 def connect_to_server(host, port):
@@ -49,11 +57,51 @@ def connect_to_server(host, port):
         client_socket.close()
         return
 
-    # Step 4: Start the listener thread
-    listener_thread = threading.Thread(target=listen_to_server, args=(client_socket ,player_marker))
-    listener_thread.daemon = True  # Ensure the thread exits when the main program exits
-    listener_thread.start()
+     # Step 4: Handle the pre-game lobby logic
+    try:
+        in_lobby_event.set()  # Set the lobby state
+        while in_lobby_event.is_set():
+            print("\n[INFO] Welcome! Choose an option:")
+            print("1. Start a new game lobby")
+            print("2. Join an existing game lobby")
+            
+            # Get client input
+            choice = input("Enter your choice (1 or 2): ").strip()
 
+            if choice == "1":
+                client_socket.send(choice.encode(FORMAT))
+                print("[WAIT] Creating a new lobby...")
+                response = client_socket.recv(1024).decode(FORMAT)
+                print(f"[SERVER RESPONSE] {response}")
+                in_lobby_event.clear()  # Exit the lobby when a game is created
+
+            elif choice == "2":
+                client_socket.send(choice.encode(FORMAT))
+                response = client_socket.recv(8192).decode(FORMAT)  # Receive available lobbies
+                print(f"[SERVER RESPONSE] {response}")
+                if "No active lobbies" not in response:
+                    lobby_choice = input("Enter the lobby name you want to join: ").strip()
+                    client_socket.send(lobby_choice.encode(FORMAT))
+                    response = client_socket.recv(1024).decode(FORMAT)
+                    print(f"[SERVER RESPONSE] {response}")
+                    if "Joined" in response:
+                        in_lobby_event.clear()  # Exit the lobby when a game is joined
+                else:
+                    print("[INFO] No active lobbies to join.")
+
+            else:
+                print("[ERROR] Invalid choice. Please enter 1 or 2.")
+
+    except Exception as e:
+        print(f"[ERROR] An error occurred during the lobby setup: {e}")
+
+    # Start listening for server responses in a separate thread
+    finally:
+        listener_thread = threading.Thread(target=listen_to_server, args=(client_socket ,player_marker))
+        listener_thread.daemon = True  # Ensure the thread exits when the main program exits
+        listener_thread.start()
+
+    # Step 5: Handle the game lobby logic
     try:
         print(f"[DEBUG] Initial game_active state: {game_active_event.is_set()}")
         while True:
@@ -64,12 +112,13 @@ def connect_to_server(host, port):
 
                     # Step 2: Prevent sending non-game messages while the game is active
                     if not game_active_event.is_set():
-
                         client_socket.send(message.encode(FORMAT))
             
                     # Step 3: Handle 'quit' command
                     if message.lower() == "quit":
                         print("[DISCONNECT] Closing connection.")
+                        client_socket.close()
+                        listener_stop_event.set()  # Signal the listener thread to stop
                         break
             
                     # If the game is active, wait for it to finish
@@ -79,7 +128,9 @@ def connect_to_server(host, port):
     except ConnectionResetError:
         print("[ERROR] Server disconnected unexpectedly.")
     finally:
-        client_socket.close()
+        listener_stop_event.set()  # Ensure the thread stops
+        listener_thread.join()     # Wait for the listener thread to exit
+        client_socket.close() #Ensure the client socket is closed
 
 def send_move(client_socket, move):
     """

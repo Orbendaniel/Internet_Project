@@ -7,7 +7,7 @@ HOST = '127.0.0.1'  # Standard loopback IP address (localhost)
 PORT = 5000  # Port to listen on (non-privileged ports are > 1023)
 FORMAT = 'utf-8'  # Define the encoding format of messages from client-server
 ADDR = (HOST, PORT)  # Creating a tuple of IP+PORT
-PLAYER_MARKERS = ["X", "O", "Δ", "☆", "♠", "♣", "♥", "♦", "♪", "♫"] # Define player markers 
+PLAYER_MARKERS = ["X", "O", "Δ", "☆", "♠", "♣", "♥", "♦", "♪", "♫","⚡", "☀", "⚔", "⚖", "⚙", "⚛", "⚜", "⚠", "⚒"] # Define player markers 
 CLIENT_MARKERS = {}  # Maps client connections to their assigned markers
 game_state = None  # Global game state
 game_state_lock = threading.Lock()  # Global lock for synchronizing game_state access
@@ -62,12 +62,9 @@ def handle_client(connection, addr, active_connections,clients):
     connection.send(marker.encode(FORMAT))  # Send the assigned marker
     print(f"[ASSIGN] Assigned marker '{CLIENT_MARKERS[connection]}' to client {addr}")
 
-# Pre-Lobby Logic: Ask the client to choose or create a lobby
+    # Pre-Lobby Logic: Ask the client to choose or create a lobby
     try:
         while True:  # Pre-lobby loop
-            # Send options to the client
-            connection.send("Welcome! Choose an option:\n1. Create a new game lobby\n2. Join an existing lobby\n".encode(FORMAT))
-
             # Receive the client's choice
             choice = connection.recv(1024).decode(FORMAT).strip()
             if choice == "1":
@@ -89,9 +86,9 @@ def handle_client(connection, addr, active_connections,clients):
                     connection.send("[INFO] No available lobbies. Please create one first.\n".encode(FORMAT))
                 else:
                     lobby_list = "Available lobbies:\n" + "\n".join(
-                        [f"{name} ({len(lobby['clients'])} players)" for name, lobby in lobbies.items()]
+                        [f"{name} ({len(lobby['clients'])} players)" + "\n" for name, lobby in lobbies.items()]
                     )
-                    connection.send((lobby_list + "\nEnter the name of the lobby to join:\n").encode(FORMAT))
+                    connection.send((lobby_list).encode(FORMAT))
 
                     # Receive and process the client's lobby choice
                     lobby_name = connection.recv(1024).decode(FORMAT).strip()
@@ -110,7 +107,8 @@ def handle_client(connection, addr, active_connections,clients):
         print(f"[ERROR] An error occurred while handling client pre-lobby: {e}")
         connection.close()
         return  # Exit the function if an error occurs
-
+    
+    # Main Game Loop 
     try:
         while connected:
             # Step 1: Receive a move or command from the client
@@ -121,25 +119,50 @@ def handle_client(connection, addr, active_connections,clients):
                 break
             
             # Handle other messages (e.g., chat messages)
-            if not ',' in msg: 
+            if not ',' and 'quit' in msg: 
                 print(f"[CHAT] {addr} says: {msg}")
 
             # Step 2: Process the client's command
             if msg.lower() == 'quit':
                 print(f"[DISCONNECT] {addr} disconnected.")
+                connection.send("quit".encode(FORMAT)) #sends a quit signal to the client
                 connected = False
                 active_connections -=1
                 CLIENT_MARKERS.pop(connection, None)  # Remove the client's marker
+
+                # Remove client from lobby
+                lobby_name = None
+                for lobby, details in lobbies.items():
+                    if connection in details["clients"]:
+                        lobby_name = lobby
+
+                if lobby_name:
+                    lobbies[lobby_name]["clients"].remove(connection)
+                    if not lobbies[lobby_name]["clients"]:  # If the lobby is empty, remove it
+                        del lobbies[lobby_name]
+                        print(f"[LOBBY DELETED] {lobby_name} deleted as it became empty.")
+
                 break
 
             if msg.lower() == 'start':
                 print(f"[START] Client {addr} is starting the game...")
+                    # Get the lobby name for this client
+                lobby_name = None
+                for lobby, details in lobbies.items():
+                    if connection in details["clients"]:
+                        lobby_name = lobby
 
-                num_players = len(clients)  # Use the length of the clients list
+                # Get the lobby details
+                lobby_details = lobbies[lobby_name]
+                clients_in_lobby = lobby_details["clients"]    
+
+                # Prepare the initial game state for the lobby
+                num_players = len(clients_in_lobby)
                 board_size = 3 if num_players <= 2 else (num_players + 1) ** 2
-                game_state = [["" for _ in range(board_size)] for _ in range(board_size)]
-                # Send "game started" notification to all clients
-                for client in clients:
+                lobby_details["game_state"] = [["" for _ in range(board_size)] for _ in range(board_size)]
+
+                # Notify all clients in the lobby that the game has started
+                for client in clients_in_lobby:
                     try:
                         client.send("game started".encode(FORMAT))
                         print(f"[BROADCAST] Sent 'game started' message to client: {client}")
@@ -147,47 +170,61 @@ def handle_client(connection, addr, active_connections,clients):
                         print(f"[ERROR] Failed to send 'game started' message to client: {e}")
                 
                 # Prepare the players list
-                players = list(CLIENT_MARKERS.values())
+                players = [CLIENT_MARKERS[client] for client in clients_in_lobby]
 
                 # Call update_game_data to set the initial state
-                game_data = update_game_data(game_state, move=None, current_player=players[0], players=players)
+                game_data = update_game_data(game_state=lobby_details["game_state"], move=None, current_player=players[0], players=players)
                 
-                # Broadcast the initial game state
-                broadcast_update(clients, game_data["board"], game_data["next_turn"], "ongoing", winner=None)
+                # Broadcast the initial game state to the lobby
+                broadcast_update(lobby_name=lobby_name, game_state=game_data["board"], next_turn= game_data["next_turn"],status= "ongoing", winner=None)
                 continue  # Continue to the next iteration to wait for moves
             
             # Handle move commands (e.g., "1,2")
             elif ',' in msg:
                 try:
+                    # Step 1: Determine the lobby
+                    lobby_name = None
+                    for lobby, details in lobbies.items():
+                        if connection in details["clients"]:
+                            lobby_name = lobby
+
+                    lobby_details = lobbies[lobby_name]
+                    game_state = lobby_details["game_state"]
+                    players = [CLIENT_MARKERS[client] for client in lobby_details["clients"]]
+
+                    # Step 2: Parse and validate the move
                     move = tuple(map(int, msg.split(',')))  # Parse move as (row, col)
                     current_player = CLIENT_MARKERS[connection]
                     print(f"[DEBUG] Parsed move: {move}")
-                    # Validate the move
-                    is_valid, validation_msg = validate_move(game_state, move)
 
-                    if not is_valid:
-                        print(f"Player {current_player} [ERROR] Invalid move: {validation_msg} skipping turn!")
-                        move=None;
-                        print("[DEBUG] validate_move COMPLETE")
-                        players = list(CLIENT_MARKERS.values())
+                    with game_state_lock:
+                        # Validate the move
+                        is_valid, validation_msg = validate_move(game_state, move)
+
+                    # Step 3: Handle move validity
+                        if not is_valid:
+                            print(f"Player {current_player} [ERROR] Invalid move: {validation_msg}. Skipping turn!")
+                            move = None  # Clear move as the turn is skipped
+                            print("[DEBUG] validate_move COMPLETE")
+                            game_data = update_game_data(game_state, move, current_player, players)
+                            print("[DEBUG] update_game_data COMPLETE")
+                            game_state = game_data["board"]  # Update the board state
+                            print(game_state)
+                        else:
+                            print("[DEBUG] validate_move COMPLETE")
+                            # Update the game state with a valid move
+                            game_data = update_game_data(game_state, move, current_player, players)
+                            print("[DEBUG] update_game_data COMPLETE")
+                            game_state = game_data["board"]  # Update the board state
+                            print(game_state)
+
+                        # Step 4: Update the game state
                         game_data = update_game_data(game_state, move, current_player, players)
-                        print("[DEBUG] update_game_data COMPLETE")
-                        game_state = game_data['board']  # Assign the updated board back to game_state
-                        print(game_state)
-                        
-                    if is_valid:
-                        print("[DEBUG] validate_move COMPLETE")
-                        # Update the game state
-                        players = list(CLIENT_MARKERS.values())
-                        game_data = update_game_data(game_state, move, current_player, players)
-                        print("[DEBUG] update_game_data COMPLETE")
-                        game_state = game_data['board']  # Assign the updated board back to game_state
-                        print(game_state)
+                        lobby_details["game_state"] = game_data["board"]  # Update the lobby's game state
 
                     # Broadcast the updated game state
-                    broadcast_update(clients, game_data["board"], game_data["next_turn"], game_data["status"], game_data["winner"])
+                    broadcast_update(lobby_name=lobby_name, game_state= game_data["board"],next_turn= game_data["next_turn"], status= game_data["status"], winner= game_data["winner"])
                     move = None #clear move for next turn
-
 
                 except ValueError:
                     connection.send("[ERROR] Invalid move format. Use 'row,col'.".encode(FORMAT))
@@ -206,18 +243,26 @@ def handle_client(connection, addr, active_connections,clients):
         connection.close()
         print(f"[CONNECTION CLOSED] {addr}")
 
-def broadcast_update(clients, game_state, next_turn, status, winner=None):
+def broadcast_update(lobby_name, game_state, next_turn, status, winner=None):
     """
     Sends the updated game state to all players in the game.
 
     Args:
-        clients (list): List of connected client sockets.
+        lobby_name (str): The name of the lobby to broadcast updates to.
         game_state (list of list): The current game board.
         next_turn (str): The marker ("X", "O", etc.) of the next player.
         status (str): The current status of the game ("ongoing", "win", "draw").
         winner (str or None): The winning player, if any.
     """
+    # Ensure the lobby exists
+    if lobby_name not in lobbies:
+        print(f"[ERROR] Lobby '{lobby_name}' does not exist.")
+        return
+
+    # Get the clients in the lobby
+    clients = lobbies[lobby_name]["clients"]
     formatted_board = [[" " if cell == "" else cell for cell in row] for row in game_state]
+
     # Prepare the game data dictionary
     game_data = {
         "board": formatted_board,
@@ -228,7 +273,7 @@ def broadcast_update(clients, game_state, next_turn, status, winner=None):
 
     # Convert the game data to a string for transmission
     update_message = repr(game_data)
-    print(f"[DEBUG] Sending game data: {update_message}")  # Debugging
+    print(f"[DEBUG] Sending game data to {lobby_name}: {update_message}")  # Debugging
 
     # Introduce a small delay to ensure clients have time to receive the broadcast
     time.sleep(0.1)  # Adjust the delay as necessary
@@ -237,10 +282,10 @@ def broadcast_update(clients, game_state, next_turn, status, winner=None):
     for client in clients:
         try:
             client.send(update_message.encode(FORMAT))
-            print(f"[BROADCAST] Sent game update to client: {client}")
+            print(f"[BROADCAST] Sent game update to client in {lobby_name}: {client}")
         except Exception as e:
-            print(f"[ERROR] Failed to send game update to client: {e}")
-
+            print(f"[ERROR] Failed to send game update to client in {lobby_name}: {e}")
+            
 def update_game_data(game_state, move, current_player, players):
     """
     Updates the game state based on the player's move.
