@@ -81,7 +81,6 @@ def connect_to_server(host, port):
     finally:
         client_socket.close()
 
-
 def send_move(client_socket, move):
     """
     Sends the player's move to the server.
@@ -93,7 +92,6 @@ def send_move(client_socket, move):
         print("[ERROR] Unable to send move. Connection to the server is broken.")
     except Exception as e:
         print(f"[ERROR] An unexpected error occurred while sending move: {e}")
-
 
 def receive_game_update(client_socket):
     """
@@ -111,7 +109,6 @@ def receive_game_update(client_socket):
     except ConnectionResetError:
         print("[ERROR] Connection to the server was reset.")
         return None
-
 
 def play_game(client_socket,player_marker):
     """

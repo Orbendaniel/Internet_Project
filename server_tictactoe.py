@@ -11,6 +11,8 @@ PLAYER_MARKERS = ["X", "O", "Δ", "☆", "♠", "♣", "♥", "♦", "♪", "♫
 CLIENT_MARKERS = {}  # Maps client connections to their assigned markers
 game_state = None  # Global game state
 game_state_lock = threading.Lock()  # Global lock for synchronizing game_state access
+lobbies = {}  # Dictionary to manage multiple game lobbies
+lobby_counter = 1  # Counter for naming new lobbies
 
 def start_server():
     # Step 1: Bind and start listening
@@ -37,6 +39,7 @@ def start_server():
 
 def handle_client(connection, addr, active_connections,clients):
     global game_state  # Access the global game state
+    global lobbies, lobby_counter # Access the global lobby dictionary and lobby lobby counter  
     print(f"[HANDLING CLIENT] {addr}")
     connected = True
 
@@ -58,6 +61,55 @@ def handle_client(connection, addr, active_connections,clients):
     # Send the assigned marker
     connection.send(marker.encode(FORMAT))  # Send the assigned marker
     print(f"[ASSIGN] Assigned marker '{CLIENT_MARKERS[connection]}' to client {addr}")
+
+# Pre-Lobby Logic: Ask the client to choose or create a lobby
+    try:
+        while True:  # Pre-lobby loop
+            # Send options to the client
+            connection.send("Welcome! Choose an option:\n1. Create a new game lobby\n2. Join an existing lobby\n".encode(FORMAT))
+
+            # Receive the client's choice
+            choice = connection.recv(1024).decode(FORMAT).strip()
+            if choice == "1":
+                # Create a new lobby
+                lobby_name = f"Lobby{lobby_counter}"
+                lobbies[lobby_name] = {
+                    "clients": [connection],
+                    "game_state": None,
+                    "players": []
+                }
+                lobby_counter += 1
+                connection.send(f"[INFO] Created and joined {lobby_name}\n".encode(FORMAT))
+                print(f"[LOBBY CREATED] {addr} created {lobby_name}.")
+                break  # Exit pre-lobby loop
+
+            elif choice == "2":
+                # Show available lobbies
+                if not lobbies:
+                    connection.send("[INFO] No available lobbies. Please create one first.\n".encode(FORMAT))
+                else:
+                    lobby_list = "Available lobbies:\n" + "\n".join(
+                        [f"{name} ({len(lobby['clients'])} players)" for name, lobby in lobbies.items()]
+                    )
+                    connection.send((lobby_list + "\nEnter the name of the lobby to join:\n").encode(FORMAT))
+
+                    # Receive and process the client's lobby choice
+                    lobby_name = connection.recv(1024).decode(FORMAT).strip()
+                    if lobby_name in lobbies:
+                        lobbies[lobby_name]["clients"].append(connection)
+                        connection.send(f"[INFO] Joined {lobby_name}\n".encode(FORMAT))
+                        print(f"[LOBBY JOINED] {addr} joined {lobby_name}.")
+                        break  # Exit pre-lobby loop
+                    else:
+                        connection.send("[ERROR] Lobby not found. Try again.\n".encode(FORMAT))
+
+            else:
+                connection.send("[ERROR] Invalid choice. Please enter 1 or 2.\n".encode(FORMAT))
+
+    except Exception as e:
+        print(f"[ERROR] An error occurred while handling client pre-lobby: {e}")
+        connection.close()
+        return  # Exit the function if an error occurs
 
     try:
         while connected:
@@ -112,6 +164,7 @@ def handle_client(connection, addr, active_connections,clients):
                     print(f"[DEBUG] Parsed move: {move}")
                     # Validate the move
                     is_valid, validation_msg = validate_move(game_state, move)
+
                     if not is_valid:
                         print(f"Player {current_player} [ERROR] Invalid move: {validation_msg} skipping turn!")
                         move=None;
