@@ -108,7 +108,7 @@ def connect_to_server(host, port):
 
     # Step 5: Handle the game lobby logic
     try:
-        print(f"[DEBUG] Initial game_active state: {game_active_event.is_set()}")
+        #print(f"[DEBUG] Initial game_active state: {game_active_event.is_set()}")
         while True:
                 if not game_active_event.is_set():
                     # Step 1: Take input from the user
@@ -174,7 +174,7 @@ def play_game(client_socket,player_marker):
     while True:
         # Step 1: Receive the current game state from the server
         update = receive_game_update(client_socket)
-        print(f"[DEBUG] Received raw game update: {update}")
+        #print(f"[DEBUG] Received raw game update: {update}")
         if update is None:
             print("[INFO] Closing the game due to server connection loss.")
             break

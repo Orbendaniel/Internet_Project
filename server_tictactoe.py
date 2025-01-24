@@ -124,7 +124,7 @@ def handle_client(connection, addr,clients):
         while connected:
             # Step 1: Receive a move or command from the client
             msg = connection.recv(1024).decode(FORMAT)
-            print(f"[DEBUG] Received message from client: {msg}")
+            #print(f"[DEBUG] Received message from client: {msg}")
             if not msg:
                 print(f"[DISCONNECT] Empty message received. Closing connection to {addr}")
                 break
@@ -207,7 +207,7 @@ def handle_client(connection, addr,clients):
                     # Step 2: Parse and validate the move
                     move = tuple(map(int, msg.split(',')))  # Parse move as (row, col)
                     current_player = CLIENT_MARKERS[connection]
-                    print(f"[DEBUG] Parsed move: {move}")
+                    #print(f"[DEBUG] Parsed move: {move}")
 
                     with game_state_lock:
                         # Validate the move
@@ -217,16 +217,16 @@ def handle_client(connection, addr,clients):
                         if not is_valid:
                             print(f"Player {current_player} [ERROR] Invalid move: {validation_msg}. Skipping turn!")
                             move = None  # Clear move as the turn is skipped
-                            print("[DEBUG] validate_move COMPLETE")
+                            #print("[DEBUG] validate_move COMPLETE")
                             game_data = update_game_data(game_state, move, current_player, players)
-                            print("[DEBUG] update_game_data COMPLETE")
+                            #print("[DEBUG] update_game_data COMPLETE")
                             game_state = game_data["board"]  # Update the board state
                             print(game_state)
                         else:
-                            print("[DEBUG] validate_move COMPLETE")
+                            #print("[DEBUG] validate_move COMPLETE")
                             # Update the game state with a valid move
                             game_data = update_game_data(game_state, move, current_player, players)
-                            print("[DEBUG] update_game_data COMPLETE")
+                            #print("[DEBUG] update_game_data COMPLETE")
                             game_state = game_data["board"]  # Update the board state
                             print(game_state)
 
@@ -360,7 +360,7 @@ def validate_move(game_state, move):
     """
     row, col = move
     board_size = len(game_state)
-    print(f"[DEBUG] Validating move: {move}")
+    #print(f"[DEBUG] Validating move: {move}")
     # Check if the move is within bounds
     if not (0 <= row < board_size and 0 <= col < board_size):
         return False, "Move is out of bounds."
